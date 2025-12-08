@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Zap } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const CTASection = () => {
   return (
@@ -17,7 +17,7 @@ const CTASection = () => {
         <div className="max-w-4xl mx-auto text-center">
           {/* Icon */}
           <div className="w-20 h-20 rounded-2xl gradient-primary mx-auto mb-8 flex items-center justify-center shadow-glow animate-float">
-            <Zap className="w-10 h-10 text-primary-foreground" />
+            <img src="/quotify-logo.svg" alt="DevQuoteX logo" className="w-10 h-10" />
           </div>
 
           {/* Heading */}

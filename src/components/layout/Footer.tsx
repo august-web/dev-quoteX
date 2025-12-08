@@ -1,32 +1,32 @@
 import { Link } from "react-router-dom";
-import { Zap, Mail, Phone, MapPin, Twitter, Linkedin, Github, Instagram } from "lucide-react";
+import { Mail, Phone, MapPin, Twitter, Linkedin, Github, Instagram } from "lucide-react";
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = {
     company: [
-      { name: "About Us", href: "#" },
-      { name: "Our Team", href: "#" },
-      { name: "Careers", href: "#" },
-      { name: "Blog", href: "#" },
+      { name: "About Us", href: "/about" },
+      { name: "Our Team", href: "/team" },
+      { name: "Careers", href: "/careers" },
+      { name: "Blog", href: "/blog" },
     ],
     services: [
-      { name: "Web Development", href: "#" },
-      { name: "E-commerce", href: "#" },
-      { name: "UI/UX Design", href: "#" },
-      { name: "SEO Services", href: "#" },
+      { name: "Web Development", href: "/#services" },
+      { name: "E-commerce", href: "/#services" },
+      { name: "UI/UX Design", href: "/#services" },
+      { name: "SEO Services", href: "/#services" },
     ],
     support: [
-      { name: "Help Center", href: "#" },
-      { name: "Privacy Policy", href: "#" },
-      { name: "Terms of Service", href: "#" },
-      { name: "Contact Us", href: "#" },
+      { name: "Help Center", href: "/help" },
+      { name: "Privacy Policy", href: "/privacy" },
+      { name: "Terms of Service", href: "/terms" },
+      { name: "Contact Us", href: "/contact" },
     ],
   };
 
   const socialLinks = [
-    { icon: Twitter, href: "#", label: "Twitter" },
+    { icon: Twitter, href: "#", label: "X" },
     { icon: Linkedin, href: "#", label: "LinkedIn" },
     { icon: Github, href: "#", label: "GitHub" },
     { icon: Instagram, href: "#", label: "Instagram" },
@@ -39,12 +39,12 @@ const Footer = () => {
           {/* Brand Column */}
           <div className="lg:col-span-2">
             <Link to="/" className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 rounded-xl gradient-primary flex items-center justify-center">
-                <Zap className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <span className="text-xl font-bold">
-                Dev<span className="text-accent">QuoteX</span>
-              </span>
+              <img
+                src="/quotify-logo.svg"
+                alt="DevQuoteX logo"
+                className="w-10 h-10 rounded-xl shadow-glow"
+              />
+              <span className="text-xl font-bold">DevQuoteX</span>
             </Link>
             <p className="text-primary-foreground/70 mb-6 max-w-sm">
               Get instant quotes for your web development projects. Professional, transparent, and fast.
@@ -52,15 +52,15 @@ const Footer = () => {
             <div className="flex flex-col gap-3">
               <a href="mailto:hello@devquotex.com" className="flex items-center gap-3 text-primary-foreground/70 hover:text-primary-foreground transition-colors">
                 <Mail className="w-5 h-5" />
-                <span>hello@devquotex.com</span>
+                <span>info.quotify@gmail.com</span>
               </a>
               <a href="tel:+1234567890" className="flex items-center gap-3 text-primary-foreground/70 hover:text-primary-foreground transition-colors">
                 <Phone className="w-5 h-5" />
-                <span>+1 (234) 567-890</span>
+                <span>+233 533 027-046</span>
               </a>
               <div className="flex items-center gap-3 text-primary-foreground/70">
                 <MapPin className="w-5 h-5" />
-                <span>San Francisco, CA</span>
+                <span>Accra, Ghana</span>
               </div>
             </div>
           </div>
@@ -71,12 +71,12 @@ const Footer = () => {
             <ul className="flex flex-col gap-3">
               {footerLinks.company.map((link) => (
                 <li key={link.name}>
-                  <a
-                    href={link.href}
+                  <Link
+                    to={link.href}
                     className="text-primary-foreground/70 hover:text-primary-foreground transition-colors"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -87,12 +87,12 @@ const Footer = () => {
             <ul className="flex flex-col gap-3">
               {footerLinks.services.map((link) => (
                 <li key={link.name}>
-                  <a
-                    href={link.href}
+                  <Link
+                    to={link.href}
                     className="text-primary-foreground/70 hover:text-primary-foreground transition-colors"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -103,12 +103,12 @@ const Footer = () => {
             <ul className="flex flex-col gap-3">
               {footerLinks.support.map((link) => (
                 <li key={link.name}>
-                  <a
-                    href={link.href}
+                  <Link
+                    to={link.href}
                     className="text-primary-foreground/70 hover:text-primary-foreground transition-colors"
                   >
                     {link.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
             </ul>

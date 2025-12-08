@@ -43,6 +43,46 @@ export const extraServices = [
 // Price per additional page
 export const pricePerPage = 50;
 
+type PricingOverrides = {
+  websiteTypes?: Record<string, number>;
+  features?: Record<string, number>;
+  extras?: Record<string, number>;
+  pricePerPage?: number;
+};
+
+function getOverrides(): PricingOverrides {
+  try {
+    const raw = localStorage.getItem("iwq_pricing_overrides");
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function getWebsiteTypes() {
+  const o = getOverrides();
+  return websiteTypes.map(w => ({ ...w, price: o.websiteTypes?.[w.id] ?? w.price }));
+}
+
+export function getFeatures() {
+  const o = getOverrides();
+  return features.map(f => ({ ...f, price: o.features?.[f.id] ?? f.price }));
+}
+
+export function getDeliveryOptions() {
+  return deliveryOptions;
+}
+
+export function getExtraServices() {
+  const o = getOverrides();
+  return extraServices.map(e => ({ ...e, price: o.extras?.[e.id] ?? e.price }));
+}
+
+export function getPricePerPage() {
+  const o = getOverrides();
+  return o.pricePerPage ?? pricePerPage;
+}
+
 // Calculate total price
 export interface QuoteConfig {
   websiteType: string;
@@ -63,32 +103,41 @@ export function calculatePrice(config: QuoteConfig): {
   breakdown: Array<{ item: string; price: number }>;
 } {
   // Get base price from website type
-  const websiteType = websiteTypes.find(w => w.id === config.websiteType);
+  const websiteType = getWebsiteTypes().find(w => w.id === config.websiteType);
   const basePrice = websiteType?.price || 0;
 
   // Calculate pages price (first page included in base)
   const additionalPages = Math.max(0, config.pageCount - 1);
-  const pagesPrice = additionalPages * pricePerPage;
+  const pagesPrice = additionalPages * getPricePerPage();
 
   // Calculate features price
   const featuresPrice = config.selectedFeatures.reduce((total, featureId) => {
-    const feature = features.find(f => f.id === featureId);
+    const feature = getFeatures().find(f => f.id === featureId);
     return total + (feature?.price || 0);
   }, 0);
 
   // Calculate extras price
   const extrasPrice = config.selectedExtras.reduce((total, extraId) => {
-    const extra = extraServices.find(e => e.id === extraId);
+    const extra = getExtraServices().find(e => e.id === extraId);
     return total + (extra?.price || 0);
   }, 0);
 
   // Get delivery multiplier
-  const delivery = deliveryOptions.find(d => d.id === config.deliveryOption);
+  const delivery = getDeliveryOptions().find(d => d.id === config.deliveryOption);
   const deliveryMultiplier = delivery?.multiplier || 1;
 
   // Calculate subtotal and total
   const subtotal = basePrice + pagesPrice + featuresPrice + extrasPrice;
-  const total = Math.round(subtotal * deliveryMultiplier);
+  const ruleAdjusted = applyPricingRules(config, {
+    basePrice,
+    pagesPrice,
+    featuresPrice,
+    extrasPrice,
+    deliveryMultiplier,
+    subtotal,
+  });
+  const totalBeforeDelivery = ruleAdjusted.subtotal;
+  const total = Math.round(totalBeforeDelivery * deliveryMultiplier);
 
   // Build breakdown
   const breakdown: Array<{ item: string; price: number }> = [];
@@ -102,14 +151,14 @@ export function calculatePrice(config: QuoteConfig): {
   }
   
   config.selectedFeatures.forEach(featureId => {
-    const feature = features.find(f => f.id === featureId);
+    const feature = getFeatures().find(f => f.id === featureId);
     if (feature) {
       breakdown.push({ item: feature.name, price: feature.price });
     }
   });
   
   config.selectedExtras.forEach(extraId => {
-    const extra = extraServices.find(e => e.id === extraId);
+    const extra = getExtraServices().find(e => e.id === extraId);
     if (extra) {
       breakdown.push({ item: extra.name, price: extra.price });
     }
@@ -120,14 +169,116 @@ export function calculatePrice(config: QuoteConfig): {
     breakdown.push({ item: `${delivery?.name} Delivery`, price: deliveryExtra });
   }
 
+  const ruleBreakdown = ruleAdjusted.breakdown;
+  const finalBreakdown = [...breakdown, ...ruleBreakdown];
+
   return {
     basePrice,
     pagesPrice,
     featuresPrice,
     extrasPrice,
     deliveryMultiplier,
-    subtotal,
+    subtotal: ruleAdjusted.subtotal,
     total,
-    breakdown,
+    breakdown: finalBreakdown,
   };
+}
+
+type RuleCondition = {
+  websiteTypeIn?: string[];
+  featuresIncludeAll?: string[];
+  featuresIncludeAny?: string[];
+  minPages?: number;
+  maxPages?: number;
+  deliveryOptionIn?: string[];
+};
+
+type AddRule = {
+  id: string;
+  kind: "add";
+  label: string;
+  amount: number | { perPage?: number; percentOfSubtotal?: number };
+  condition?: RuleCondition;
+};
+
+type MultiplyRule = {
+  id: string;
+  kind: "multiply";
+  label?: string;
+  multiplier: number;
+  condition?: RuleCondition;
+};
+
+type DiscountRule = {
+  id: string;
+  kind: "discount";
+  label: string;
+  amount: number | { percentOfSubtotal: number };
+  condition?: RuleCondition;
+};
+
+type PricingRule = AddRule | MultiplyRule | DiscountRule;
+
+type RuleInput = {
+  basePrice: number;
+  pagesPrice: number;
+  featuresPrice: number;
+  extrasPrice: number;
+  deliveryMultiplier: number;
+  subtotal: number;
+};
+
+function getRuleConfig(): PricingRule[] {
+  try {
+    const raw = localStorage.getItem("iwq_pricing_rules");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function condPass(cond: RuleCondition | undefined, config: QuoteConfig): boolean {
+  if (!cond) return true;
+  if (cond.websiteTypeIn && !cond.websiteTypeIn.includes(config.websiteType)) return false;
+  if (cond.deliveryOptionIn && !cond.deliveryOptionIn.includes(config.deliveryOption)) return false;
+  if (typeof cond.minPages === "number" && config.pageCount < cond.minPages) return false;
+  if (typeof cond.maxPages === "number" && config.pageCount > cond.maxPages) return false;
+  if (cond.featuresIncludeAll && !cond.featuresIncludeAll.every(f => config.selectedFeatures.includes(f))) return false;
+  if (cond.featuresIncludeAny && !cond.featuresIncludeAny.some(f => config.selectedFeatures.includes(f))) return false;
+  return true;
+}
+
+function applyPricingRules(config: QuoteConfig, input: RuleInput): { subtotal: number; breakdown: Array<{ item: string; price: number }> } {
+  const rules = getRuleConfig();
+  let subtotal = input.subtotal;
+  const breakdown: Array<{ item: string; price: number }> = [];
+
+  for (const rule of rules) {
+    if (!condPass(rule.condition, config)) continue;
+    if (rule.kind === "add") {
+      const amt = typeof rule.amount === "number"
+        ? rule.amount
+        : (rule.amount.perPage ? rule.amount.perPage * Math.max(0, config.pageCount - 1) : 0) + (rule.amount.percentOfSubtotal ? (rule.amount.percentOfSubtotal / 100) * subtotal : 0);
+      if (amt > 0) {
+        subtotal += amt;
+        breakdown.push({ item: rule.label, price: Math.round(amt) });
+      }
+    } else if (rule.kind === "multiply") {
+      const before = subtotal;
+      subtotal = subtotal * rule.multiplier;
+      const delta = Math.round(subtotal - before);
+      if (delta !== 0 && rule.label) breakdown.push({ item: rule.label, price: delta });
+    } else if (rule.kind === "discount") {
+      const amt = typeof rule.amount === "number"
+        ? rule.amount
+        : (rule.amount.percentOfSubtotal / 100) * subtotal;
+      const applied = Math.max(0, Math.round(amt));
+      if (applied > 0) {
+        subtotal -= applied;
+        breakdown.push({ item: rule.label, price: -applied });
+      }
+    }
+  }
+
+  return { subtotal: Math.round(subtotal), breakdown };
 }

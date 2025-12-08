@@ -1,14 +1,17 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
-  websiteTypes, 
-  features, 
-  deliveryOptions, 
-  extraServices, 
+  getWebsiteTypes,
+  getFeatures,
+  getDeliveryOptions,
+  getExtraServices,
   calculatePrice,
   type QuoteConfig 
 } from "@/lib/pricing";
+import { evaluateConfig } from "@/lib/guards";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { track } from "@/lib/analytics";
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -43,13 +46,27 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
     deliveryOption: "normal",
     selectedExtras: [],
   });
+  const [completed, setCompleted] = useState(false);
 
   const pricing = calculatePrice(config);
+  const guard = useMemo(() => evaluateConfig(config), [config]);
+
+  useEffect(() => {
+    track({ type: "step_view", step: currentStep });
+  }, [currentStep]);
+
+  useEffect(() => {
+    return () => {
+      if (!completed) track({ type: "drop_off", step: currentStep });
+    };
+  }, [completed, currentStep]);
 
   const handleNext = () => {
     if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
     } else {
+      setCompleted(true);
+      track({ type: "quote_complete" });
       onComplete(config);
     }
   };
@@ -67,6 +84,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
         ? prev.selectedFeatures.filter(f => f !== featureId)
         : [...prev.selectedFeatures, featureId],
     }));
+    track({ type: "feature_toggle", featureId });
   };
 
   const toggleExtra = (extraId: string) => {
@@ -76,6 +94,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
         ? prev.selectedExtras.filter(e => e !== extraId)
         : [...prev.selectedExtras, extraId],
     }));
+    track({ type: "extra_toggle", extraId });
   };
 
   const canProceed = () => {
@@ -83,7 +102,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
       case 1:
         return config.websiteType !== "";
       default:
-        return true;
+        return guard.errors.length === 0;
     }
   };
 
@@ -131,6 +150,34 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
         {/* Main Form Area */}
         <div className="lg:col-span-2">
           <div className="bg-card rounded-2xl border border-border p-8 min-h-[400px]">
+            {guard.errors.length > 0 && (
+              <div className="mb-6 space-y-3">
+                {guard.errors.map((e, i) => (
+                  <Alert key={i} variant="destructive">
+                    <AlertTitle>Issue</AlertTitle>
+                    <AlertDescription>{e}</AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            )}
+            {guard.suggestions.length > 0 && (
+              <div className="mb-6 space-y-3">
+                {guard.suggestions.map(s => (
+                  <Alert key={s.id}>
+                    <AlertTitle>Suggestion</AlertTitle>
+                    <AlertDescription className="flex items-center justify-between">
+                      <span>{s.text}</span>
+                      {s.action?.type === "addFeature" && (
+                        <Button size="sm" variant="outline" onClick={() => toggleFeature(s.action!.value)}>Add</Button>
+                      )}
+                      {s.action?.type === "setDelivery" && (
+                        <Button size="sm" variant="outline" onClick={() => setConfig(prev => ({ ...prev, deliveryOption: s.action!.value }))}>Apply</Button>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            )}
             {/* Step 1: Website Type */}
             {currentStep === 1 && (
               <div className="animate-fade-up">
@@ -141,7 +188,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   Choose the option that best describes your project.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {websiteTypes.map((type) => (
+                  {getWebsiteTypes().map((type) => (
                     <button
                       key={type.id}
                       onClick={() => setConfig(prev => ({ ...prev, websiteType: type.id }))}
@@ -212,7 +259,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   Choose the functionality you need for your website.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {features.map((feature) => (
+                  {getFeatures().map((feature) => (
                     <button
                       key={feature.id}
                       onClick={() => toggleFeature(feature.id)}
@@ -258,7 +305,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   Choose your preferred delivery timeline.
                 </p>
                 <div className="grid grid-cols-1 gap-4">
-                  {deliveryOptions.map((option) => (
+                  {getDeliveryOptions().map((option) => (
                     <button
                       key={option.id}
                       onClick={() => setConfig(prev => ({ ...prev, deliveryOption: option.id }))}
@@ -304,7 +351,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   Add-ons to complete your package (optional).
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {extraServices.map((extra) => (
+                  {getExtraServices().map((extra) => (
                     <button
                       key={extra.id}
                       onClick={() => toggleExtra(extra.id)}

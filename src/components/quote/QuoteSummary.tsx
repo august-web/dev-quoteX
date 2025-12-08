@@ -1,10 +1,16 @@
 import { Button } from "@/components/ui/button";
 import { 
-  calculatePrice, 
-  websiteTypes, 
-  deliveryOptions,
+  calculatePrice,
+  getWebsiteTypes,
+  getDeliveryOptions,
   type QuoteConfig 
 } from "@/lib/pricing";
+import { Button as UIButton } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useState } from "react";
+import { useToast } from "@/components/ui/use-toast";
 import { 
   Download, 
   CreditCard, 
@@ -14,6 +20,7 @@ import {
   Calendar,
   Layers
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 
 interface QuoteSummaryProps {
   config: QuoteConfig;
@@ -22,16 +29,52 @@ interface QuoteSummaryProps {
 
 const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
   const pricing = calculatePrice(config);
-  const websiteType = websiteTypes.find(w => w.id === config.websiteType);
-  const delivery = deliveryOptions.find(d => d.id === config.deliveryOption);
+  const websiteType = getWebsiteTypes().find(w => w.id === config.websiteType);
+  const delivery = getDeliveryOptions().find(d => d.id === config.deliveryOption);
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [projectName, setProjectName] = useState(websiteType?.name || "");
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const developerEmail = params.get("dev") || localStorage.getItem("iwq_dev_email") || "";
 
   const handleDownloadPDF = () => {
-    // For now, we'll show an alert. In production, this would generate a PDF
-    alert("PDF download feature coming soon! Connect Lovable Cloud to enable this functionality.");
+    const data = {
+      title: websiteType?.name || "Website",
+      total: pricing.total,
+      breakdown: pricing.breakdown,
+      delivery: delivery?.duration || "",
+      pages: config.pageCount,
+    };
+    import("@/lib/pdf").then(m => m.generateQuotePDF(data));
   };
 
   const handleProceedToPayment = () => {
-    alert("Payment integration coming soon! Connect Lovable Cloud to enable Stripe/Paystack payments.");
+    const raw = localStorage.getItem("iwq_requests");
+    const arr = raw ? JSON.parse(raw) : [];
+    const id = Math.random().toString(36).slice(2);
+    const req = {
+      id,
+      clientName: clientName || "Client",
+      clientEmail,
+      clientPhone,
+      projectName: projectName || websiteType?.name || "Project",
+      createdAt: Date.now(),
+      status: "in_progress",
+      depositPaid: true,
+      finalPaid: false,
+      progress: 0,
+      config,
+      total: pricing.total,
+      developerEmail,
+    };
+    const next = [req, ...arr];
+    localStorage.setItem("iwq_requests", JSON.stringify(next));
+    localStorage.setItem("iwq_onboarding_current", JSON.stringify({ requestId: id }));
+    navigate(`/onboarding?id=${id}`);
   };
 
   return (
@@ -123,6 +166,58 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
               <CreditCard className="w-5 h-5" />
               Proceed to Payment
             </Button>
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <UIButton variant="default" size="lg" className="w-full">Save Request</UIButton>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Client Details</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="clientName">Name</Label>
+                    <Input id="clientName" value={clientName} onChange={(e) => setClientName(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="clientEmail">Email</Label>
+                    <Input id="clientEmail" type="email" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="clientPhone">Phone</Label>
+                    <Input id="clientPhone" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="projectName">Project</Label>
+                    <Input id="projectName" value={projectName} onChange={(e) => setProjectName(e.target.value)} />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <UIButton onClick={() => {
+                    const raw = localStorage.getItem("iwq_requests");
+                    const arr = raw ? JSON.parse(raw) : [];
+                    const req = {
+                      id: Math.random().toString(36).slice(2),
+                      clientName,
+                      clientEmail,
+                      clientPhone,
+                      projectName,
+                      createdAt: Date.now(),
+                      status: "new",
+                      depositPaid: false,
+                      finalPaid: false,
+                      progress: 0,
+                      config,
+                      total: pricing.total,
+                    };
+                  const next = [req, ...arr];
+                  localStorage.setItem("iwq_requests", JSON.stringify(next));
+                  toast({ title: "Request saved" });
+                  setOpen(false);
+                }}>Save</UIButton>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             
             <Button 
               variant="outline" 
@@ -176,3 +271,4 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
 };
 
 export default QuoteSummary;
+import { useNavigate } from "react-router-dom";
