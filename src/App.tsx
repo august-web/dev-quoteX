@@ -22,6 +22,19 @@ import Contact from "./pages/Contact";
 
 const queryClient = new QueryClient();
 
+import { useEffect, useState } from "react";
+
+const AdminGuard = () => {
+  const [ready, setReady] = useState(false);
+  const [authed, setAuthed] = useState(false);
+  useEffect(() => {
+    setAuthed(isDevAuthenticated());
+    setReady(true);
+  }, []);
+  if (!ready) return null;
+  return authed ? <AdminDashboard /> : <Navigate to="/dev-login" replace />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -31,7 +44,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/quote" element={<QuotePage />} />
-          <Route path="/admin" element={isDevAuthenticated() ? <AdminDashboard /> : <Navigate to="/dev-login" replace />} />
+          <Route path="/admin" element={<AdminGuard />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/dev-login" element={<DevLogin />} />
           <Route path="/about" element={<About />} />
