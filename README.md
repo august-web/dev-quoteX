@@ -1,73 +1,56 @@
-# Welcome to your Lovable project
+# DevQuoteX — Instant Web Development Quotes
 
-## Project info
+DevQuoteX streamlines website scoping and pricing for clients and developers. It provides instant, transparent quotes with clear breakdowns, built-in guardrails, and a polished UI for a professional handoff.
 
-**URL**: https://lovable.dev/projects/372909ff-02eb-43c1-bca2-e09cb82a71af
+## What this project is for
 
-## How can I edit this code?
+- Quickly estimate web project costs with a guided quote builder.
+- Share transparent breakdowns and PDF summaries with clients.
+- Keep scope under control using sensible defaults and guardrails.
+- Offer a clean developer flow for managing quotes and onboarding.
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- Vite + React + TypeScript
+- Tailwind CSS + shadcn-ui (Radix UI primitives)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/372909ff-02eb-43c1-bca2-e09cb82a71af) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+Prerequisites:
+- Node.js and npm installed
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+Install and run:
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone https://github.com/august-web/dev-quoteX
+cd dev-quoteX
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Install dependencies
+npm install
 
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the dev server
 npm run dev
+
+# Lint and build
+npm run lint
+npm run build
 ```
 
-**Edit a file directly in GitHub**
+## Scripts
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `npm run dev` — start the development server (Vite)
+- `npm run build` — build for production into `dist`
+- `npm run preview` — preview the production build locally
+- `npm run lint` — run ESLint across the project
 
-**Use GitHub Codespaces**
+## Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+This is a Single-Page Application (SPA).
 
-## What technologies are used for this project?
+- Vercel: `vercel.json` is configured to route all paths to `index.html` and build with `npm run build` outputting `dist`.
+- Netlify: `public/_redirects` contains `/* /index.html 200` for SPA routing. Use build command `npm run build` and publish directory `dist`.
 
-This project is built with:
+## Author
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/372909ff-02eb-43c1-bca2-e09cb82a71af) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Built by Augustine (`august-web`).
