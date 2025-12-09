@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import Index from "./pages/Index";
 import QuotePage from "./pages/QuotePage";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -41,6 +41,17 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        {(() => {
+          const ScrollToTop = () => {
+            const loc = useLocation();
+            useEffect(() => {
+              try { window.history.scrollRestoration = "manual"; } catch { /* noop */ }
+              window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+            }, [loc.pathname, loc.search, loc.hash]);
+            return null;
+          };
+          return <ScrollToTop />;
+        })()}
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/quote" element={<QuotePage />} />

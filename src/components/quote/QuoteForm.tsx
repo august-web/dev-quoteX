@@ -20,6 +20,11 @@ import {
   type CurrencyCode,
   type RegionCode 
 } from "@/lib/pricing";
+import { setSpecRuleExtras, clearSpecRuleExtras, deriveSpecRulesFromText, type PricingRule } from "@/lib/pricing";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { useRef } from "react";
+import { useToast } from "@/components/ui/use-toast";
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { evaluateConfig } from "@/lib/guards";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -61,6 +66,12 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
     currency: defaultCurrencyForRegion(detectRegion()),
   });
   const [completed, setCompleted] = useState(false);
+  const [specText, setSpecText] = useState("");
+  const [specUrl, setSpecUrl] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisInfo, setAnalysisInfo] = useState<{ features: string[]; rules: PricingRule[]; websiteType?: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { toast } = useToast();
 
   const pricing = calculatePrice(config);
   const guard = useMemo(() => evaluateConfig(config), [config]);
@@ -78,7 +89,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
   useEffect(() => {
     detectRegionGeo().then((geo) => {
       setConfig(prev => ({ ...prev, region: geo, currency: defaultCurrencyForRegion(geo) }));
-    }).catch(() => {});
+    }).catch(() => void 0);
   }, []);
 
   const handleNext = () => {
@@ -89,6 +100,44 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
       track({ type: "quote_complete" });
       onComplete(config);
     }
+  };
+
+  const analyzeSpec = async () => {
+    setAnalyzing(true);
+    let text = specText;
+    if (!text && specUrl) {
+      try {
+        const r = await fetch(specUrl);
+        if (r.ok) text = await r.text();
+      } catch { void 0; }
+    }
+    const derived = deriveSpecRulesFromText(text);
+    const nextFeatures = Array.from(new Set([...(config.selectedFeatures || []), ...derived.detectedFeatures]));
+    const nextWebsite = derived.inferredWebsiteType ? derived.inferredWebsiteType : config.websiteType;
+    setSpecRuleExtras(derived.rules);
+    setConfig(prev => ({ ...prev, selectedFeatures: nextFeatures, websiteType: nextWebsite }));
+    setAnalysisInfo({ features: derived.detectedFeatures, rules: derived.rules, websiteType: derived.inferredWebsiteType });
+    setAnalyzing(false);
+  };
+
+  const openFilePicker = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const type = file.type;
+    if (type === "text/plain") {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setSpecText(String(reader.result || ""));
+        toast({ title: "Document loaded", description: `${file.name}` });
+      };
+      reader.readAsText(file);
+      return;
+    }
+    toast({ title: "Unsupported file", description: "Please upload a .txt file or paste a public link/text." });
   };
 
   const handleBack = () => {
@@ -435,6 +484,23 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
         <div className="lg:col-span-1">
           <div className="bg-card rounded-2xl border border-border p-6 sticky top-24">
             <h3 className="text-lg font-semibold text-foreground mb-4">Quote Summary</h3>
+
+            {/* SRS / Document */}
+            <div className="space-y-3 mb-4">
+              <span className="text-sm font-medium text-foreground">SRS / Document</span>
+              <input ref={fileInputRef} type="file" accept=".txt,.pdf,.doc,.docx" className="hidden" onChange={handleFileSelected} />
+              <div className="flex gap-2">
+                <Button size="sm" variant="hero" onClick={openFilePicker}>Choose from Files/Gallery</Button>
+                <Button size="sm" variant="outline" onClick={analyzeSpec} disabled={analyzing}>{analyzing ? "Analyzing..." : "Analyze"}</Button>
+              </div>
+              <Input placeholder="Google Doc or public link" value={specUrl} onChange={(e) => setSpecUrl(e.target.value)} />
+              <Textarea placeholder="Paste SRS text (optional)" value={specText} onChange={(e) => setSpecText(e.target.value)} />
+              {analysisInfo && (
+                <div className="text-xs text-muted-foreground">
+                  <div>Detected: {analysisInfo.features.join(", ") || "None"}</div>
+                </div>
+              )}
+            </div>
 
             {/* Currency & Region */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">

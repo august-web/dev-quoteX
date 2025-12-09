@@ -323,7 +323,7 @@ type DiscountRule = {
   condition?: RuleCondition;
 };
 
-type PricingRule = AddRule | MultiplyRule | DiscountRule;
+export type PricingRule = AddRule | MultiplyRule | DiscountRule;
 
 type RuleInput = {
   basePrice: number;
@@ -337,10 +337,70 @@ type RuleInput = {
 function getRuleConfig(): PricingRule[] {
   try {
     const raw = localStorage.getItem("iwq_pricing_rules");
-    return raw ? JSON.parse(raw) : [];
+    const base = raw ? JSON.parse(raw) : [];
+    const extraRaw = localStorage.getItem("iwq_pricing_rules_extra");
+    const extra = extraRaw ? JSON.parse(extraRaw) : [];
+    return [...base, ...extra];
   } catch {
     return [];
   }
+}
+
+export function setSpecRuleExtras(rules: PricingRule[]) {
+  try {
+    localStorage.setItem("iwq_pricing_rules_extra", JSON.stringify(rules));
+  } catch { void 0; }
+}
+
+export function clearSpecRuleExtras() {
+  try {
+    localStorage.removeItem("iwq_pricing_rules_extra");
+  } catch { void 0; }
+}
+
+export function deriveSpecRulesFromText(text: string): { rules: PricingRule[]; detectedFeatures: string[]; inferredWebsiteType?: string } {
+  const t = (text || "").toLowerCase();
+  const rules: PricingRule[] = [];
+  const features: string[] = [];
+  let inferredWebsiteType: string | undefined;
+
+  const authHits = /(auth|login|signin|signup|oauth|two[-\s]?factor|2fa|password reset)/g.test(t);
+  if (authHits) features.push("user-login");
+
+  const adminHits = /(admin|dashboard|analytics panel|cms)/g.test(t);
+  if (adminHits) features.push("admin-dashboard");
+
+  const ecommerceHits = /(e[-\s]?commerce|shop|store|cart|checkout|products)/g.test(t);
+  if (ecommerceHits) inferredWebsiteType = "ecommerce";
+
+  const paymentHits = /(stripe|paypal|payment|checkout|subscription|billing)/g.test(t);
+  if (paymentHits) features.push("payment");
+
+  const apiHits = /(api|webhook|integration|graphql|rest|sdk)/g.test(t);
+  if (apiHits) features.push("api-integration");
+
+  const multilingualHits = /(multi[-\s]?language|i18n|localization|translate)/g.test(t);
+  if (multilingualHits) features.push("multilingual");
+
+  const realtimeHits = /(real[-\s]?time|websocket|socket\.io|live update)/g.test(t);
+  if (realtimeHits) rules.push({ id: "spec-realtime", kind: "add", label: "Real-time features", amount: { percentOfSubtotal: 8 } });
+
+  const rbacHits = /(role[-\s]?based|rbac|permissions|access control)/g.test(t);
+  if (rbacHits) rules.push({ id: "spec-rbac", kind: "add", label: "Role-based access", amount: { percentOfSubtotal: 6 } });
+
+  const securityHits = /(gdpr|pci|hipaa|audit|encryption)/g.test(t);
+  if (securityHits) rules.push({ id: "spec-compliance", kind: "add", label: "Compliance and security", amount: { percentOfSubtotal: 7 } });
+
+  const backendHits = /(custom backend|microservice|queue|kafka|rabbitmq|redis|database|postgres|mysql|mongo|server[-\s]?side)/g.test(t);
+  if (backendHits) rules.push({ id: "spec-backend", kind: "add", label: "Custom backend", amount: { percentOfSubtotal: 10 } });
+
+  const reportHits = /(report|export|analytics|bi)/g.test(t);
+  if (reportHits) rules.push({ id: "spec-reporting", kind: "add", label: "Reporting and analytics", amount: { percentOfSubtotal: 5 } });
+
+  const aiHits = /(ai|machine learning|ml|chatbot)/g.test(t);
+  if (aiHits) features.push("chatbot");
+
+  return { rules, detectedFeatures: Array.from(new Set(features)), inferredWebsiteType };
 }
 
 function condPass(cond: RuleCondition | undefined, config: QuoteConfig): boolean {
