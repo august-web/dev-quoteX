@@ -3,6 +3,7 @@ import {
   calculatePrice,
   getWebsiteTypes,
   getDeliveryOptions,
+  formatCurrency,
   type QuoteConfig 
 } from "@/lib/pricing";
 import { Button as UIButton } from "@/components/ui/button";
@@ -140,7 +141,7 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
                     <div className="w-2 h-2 rounded-full bg-primary" />
                     <span className="text-foreground">{item.item}</span>
                   </div>
-                  <span className="font-semibold text-foreground">${item.price}</span>
+                  <span className="font-semibold text-foreground">{formatCurrency(item.price, config.currency)}</span>
                 </div>
               ))}
             </div>
@@ -148,7 +149,7 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
             <div className="mt-6 pt-6 border-t-2 border-primary/20">
               <div className="flex items-center justify-between">
                 <span className="text-xl font-semibold text-foreground">Total</span>
-                <span className="text-4xl font-bold text-gradient">${pricing.total}</span>
+                <span className="text-4xl font-bold text-gradient">{formatCurrency(pricing.total, config.currency)}</span>
               </div>
             </div>
           </div>

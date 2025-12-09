@@ -6,9 +6,21 @@ import {
   getFeatures,
   getDeliveryOptions,
   getExtraServices,
+  getPricePerPage,
   calculatePrice,
-  type QuoteConfig 
+  convertFromUSD,
+  formatCurrency,
+  currencies,
+  regions,
+  detectRegion,
+  detectRegionGeo,
+  defaultCurrencyForRegion,
+  getRegionMultiplier,
+  type QuoteConfig,
+  type CurrencyCode,
+  type RegionCode 
 } from "@/lib/pricing";
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { evaluateConfig } from "@/lib/guards";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { track } from "@/lib/analytics";
@@ -45,6 +57,8 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
     selectedFeatures: ["admin-dashboard"],
     deliveryOption: "normal",
     selectedExtras: [],
+    region: detectRegion(),
+    currency: defaultCurrencyForRegion(detectRegion()),
   });
   const [completed, setCompleted] = useState(false);
 
@@ -60,6 +74,12 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
       if (!completed) track({ type: "drop_off", step: currentStep });
     };
   }, [completed, currentStep]);
+
+  useEffect(() => {
+    detectRegionGeo().then((geo) => {
+      setConfig(prev => ({ ...prev, region: geo, currency: defaultCurrencyForRegion(geo) }));
+    }).catch(() => {});
+  }, []);
 
   const handleNext = () => {
     if (currentStep < 5) {
@@ -198,10 +218,10 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                           : "border-border hover:bg-secondary/50"
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-foreground">{type.name}</h3>
-                        <span className="text-primary font-bold">${type.price}</span>
-                      </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-foreground">{type.name}</h3>
+                      <span className="text-primary font-bold">{formatCurrency(convertFromUSD(Math.round(type.price * getRegionMultiplier(config.region)), config.currency), config.currency)}</span>
+                    </div>
                       <p className="text-sm text-muted-foreground">{type.description}</p>
                     </button>
                   ))}
@@ -216,7 +236,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   How many pages do you need?
                 </h2>
                 <p className="text-muted-foreground mb-8">
-                  First page is included. Additional pages are ${50} each.
+                  First page is included. Additional pages are {formatCurrency(convertFromUSD(Math.round(getPricePerPage() * getRegionMultiplier(config.region)), config.currency), config.currency)} each.
                 </p>
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="flex items-center gap-6">
@@ -242,7 +262,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   </div>
                   {config.pageCount > 1 && (
                     <p className="mt-8 text-lg text-muted-foreground">
-                      +${(config.pageCount - 1) * 50} for {config.pageCount - 1} additional page{config.pageCount > 2 ? "s" : ""}
+                      {formatCurrency(convertFromUSD(Math.round((config.pageCount - 1) * getPricePerPage() * getRegionMultiplier(config.region)), config.currency), config.currency)} for {config.pageCount - 1} additional page{config.pageCount > 2 ? "s" : ""}
                     </p>
                   )}
                 </div>
@@ -284,7 +304,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                           </div>
                           <span className="font-medium text-foreground">{feature.name}</span>
                         </div>
-                        <span className="text-primary font-semibold">+${feature.price}</span>
+                        <span className="text-primary font-semibold">{formatCurrency(convertFromUSD(Math.round(feature.price * getRegionMultiplier(config.region)), config.currency), config.currency)}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-2 ml-8">
                         {feature.description}
@@ -376,7 +396,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                           </div>
                           <span className="font-medium text-foreground">{extra.name}</span>
                         </div>
-                        <span className="text-primary font-semibold">+${extra.price}</span>
+                        <span className="text-primary font-semibold">{formatCurrency(convertFromUSD(Math.round(extra.price * getRegionMultiplier(config.region)), config.currency), config.currency)}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-2 ml-8">
                         {extra.description}
@@ -415,13 +435,39 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
         <div className="lg:col-span-1">
           <div className="bg-card rounded-2xl border border-border p-6 sticky top-24">
             <h3 className="text-lg font-semibold text-foreground mb-4">Quote Summary</h3>
+
+            {/* Currency & Region */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div>
+                <span className="text-xs text-muted-foreground">Currency</span>
+                <Select value={config.currency} onValueChange={(v) => setConfig(prev => ({ ...prev, currency: v as CurrencyCode }))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {currencies.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.id}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">Region</span>
+                <Select value={config.region} onValueChange={(v) => setConfig(prev => ({ ...prev, region: v as RegionCode, currency: defaultCurrencyForRegion(v as RegionCode) }))}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {regions.map(r => (
+                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             
             {/* Price Breakdown */}
             <div className="space-y-3 mb-6">
               {pricing.breakdown.map((item, index) => (
                 <div key={index} className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{item.item}</span>
-                  <span className="text-foreground font-medium">${item.price}</span>
+                  <span className="text-foreground font-medium">{formatCurrency(item.price, config.currency)}</span>
                 </div>
               ))}
             </div>
@@ -430,7 +476,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
             <div className="pt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <span className="text-foreground font-semibold">Total</span>
-                <span className="text-3xl font-bold text-gradient">${pricing.total}</span>
+                <span className="text-3xl font-bold text-gradient">{formatCurrency(pricing.total, config.currency)}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 *Prices are estimates and may vary based on specific requirements
