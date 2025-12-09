@@ -489,9 +489,9 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
             <div className="space-y-3 mb-4">
               <span className="text-sm font-medium text-foreground">SRS / Document</span>
               <input ref={fileInputRef} type="file" accept=".txt,.pdf,.doc,.docx" className="hidden" onChange={handleFileSelected} />
-              <div className="flex gap-2">
-                <Button size="sm" variant="hero" onClick={openFilePicker}>Choose from Files/Gallery</Button>
-                <Button size="sm" variant="outline" onClick={analyzeSpec} disabled={analyzing}>{analyzing ? "Analyzing..." : "Analyze"}</Button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Button size="sm" variant="hero" onClick={openFilePicker} className="w-full sm:w-auto">Choose from Files/Gallery</Button>
+                <Button size="sm" variant="outline" onClick={analyzeSpec} disabled={analyzing} className="w-full sm:w-auto">{analyzing ? "Analyzing..." : "Analyze"}</Button>
               </div>
               <Input placeholder="Google Doc or public link" value={specUrl} onChange={(e) => setSpecUrl(e.target.value)} />
               <Textarea placeholder="Paste SRS text (optional)" value={specText} onChange={(e) => setSpecText(e.target.value)} />
