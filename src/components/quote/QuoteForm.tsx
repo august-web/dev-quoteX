@@ -42,7 +42,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
   const [config, setConfig] = useState<QuoteConfig>({
     websiteType: "",
     pageCount: 1,
-    selectedFeatures: [],
+    selectedFeatures: ["admin-dashboard"],
     deliveryOption: "normal",
     selectedExtras: [],
   });
