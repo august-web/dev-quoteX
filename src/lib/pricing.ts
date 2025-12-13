@@ -83,105 +83,6 @@ export function getPricePerPage() {
   return o.pricePerPage ?? pricePerPage;
 }
 
-// Currency and region support
-export type CurrencyCode = "USD" | "EUR" | "GBP" | "INR";
-export type RegionCode = "US" | "UK" | "EU" | "IN" | "OTHER";
-
-export const currencies: { id: CurrencyCode; name: string }[] = [
-  { id: "USD", name: "US Dollar" },
-  { id: "EUR", name: "Euro" },
-  { id: "GBP", name: "British Pound" },
-  { id: "INR", name: "Indian Rupee" },
-];
-
-export const regions: { id: RegionCode; name: string }[] = [
-  { id: "US", name: "United States" },
-  { id: "UK", name: "United Kingdom" },
-  { id: "EU", name: "European Union" },
-  { id: "IN", name: "India" },
-  { id: "OTHER", name: "Other" },
-];
-
-const usdToCurrencyRates: Record<CurrencyCode, number> = {
-  USD: 1,
-  EUR: 0.92,
-  GBP: 0.78,
-  INR: 83,
-};
-
-const regionMultipliers: Record<RegionCode, number> = {
-  US: 1,
-  UK: 1.05,
-  EU: 0.95,
-  IN: 0.6,
-  OTHER: 1,
-};
-
-export function getRegionMultiplier(region: RegionCode): number {
-  return regionMultipliers[region] ?? 1;
-}
-
-export function detectRegion(): RegionCode {
-  try {
-    const lang = navigator?.language || "en-US";
-    if (lang.includes("-IN")) return "IN";
-    if (lang.includes("-GB")) return "UK";
-    const euroLangs = ["de", "fr", "es", "it", "nl", "pt", "pl", "sv", "fi", "cs", "sk", "el", "hu", "ro" ];
-    const prefix = lang.split("-")[0];
-    if (euroLangs.includes(prefix)) return "EU";
-    if (lang.includes("-US")) return "US";
-    return "OTHER";
-  } catch {
-    return "OTHER";
-  }
-}
-
-export function defaultCurrencyForRegion(region: RegionCode): CurrencyCode {
-  switch (region) {
-    case "US": return "USD";
-    case "UK": return "GBP";
-    case "EU": return "EUR";
-    case "IN": return "INR";
-    default: return "USD";
-  }
-}
-
-function mapCountryToRegion(cc: string): RegionCode {
-  if (cc === "US") return "US";
-  if (cc === "GB" || cc === "UK") return "UK";
-  if (cc === "IN") return "IN";
-  const eu = new Set(["AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR","HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK","SI","ES","SE"]);
-  if (eu.has(cc)) return "EU";
-  return "OTHER";
-}
-
-export async function detectRegionGeo(): Promise<RegionCode> {
-  try {
-    const resp = await Promise.race([
-      fetch("https://ipapi.co/json/").then(r => r.ok ? r.json() : null),
-      new Promise(resolve => setTimeout(() => resolve(null), 2500)),
-    ]);
-    const cc = (resp && (resp.country_code || resp.country)) ? String(resp.country_code || resp.country).toUpperCase() : "";
-    return cc ? mapCountryToRegion(cc) : "OTHER";
-  } catch {
-    return "OTHER";
-  }
-}
-
-export function convertFromUSD(amountUSD: number, currency: CurrencyCode): number {
-  const rate = usdToCurrencyRates[currency] ?? 1;
-  return Math.round(amountUSD * rate);
-}
-
-export function formatCurrency(amount: number, currency: CurrencyCode): string {
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
-  } catch {
-    const symbol = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : "₹";
-    return `${symbol}${amount}`;
-  }
-}
-
 // Calculate total price
 export interface QuoteConfig {
   websiteType: string;
@@ -189,8 +90,6 @@ export interface QuoteConfig {
   selectedFeatures: string[];
   deliveryOption: string;
   selectedExtras: string[];
-  currency: CurrencyCode;
-  region: RegionCode;
 }
 
 export function calculatePrice(config: QuoteConfig): {
@@ -237,12 +136,8 @@ export function calculatePrice(config: QuoteConfig): {
     deliveryMultiplier,
     subtotal,
   });
-  const region = config.region || detectRegion();
-  const currency = config.currency || defaultCurrencyForRegion(region);
-  const regionAdjustedUSD = Math.round(ruleAdjusted.subtotal * (regionMultipliers[region] ?? 1));
-  const totalBeforeDeliveryUSD = regionAdjustedUSD;
-  const totalUSD = Math.round(totalBeforeDeliveryUSD * deliveryMultiplier);
-  const total = convertFromUSD(totalUSD, currency);
+  const totalBeforeDelivery = ruleAdjusted.subtotal;
+  const total = Math.round(totalBeforeDelivery * deliveryMultiplier);
 
   // Build breakdown
   const breakdown: Array<{ item: string; price: number }> = [];
@@ -270,21 +165,20 @@ export function calculatePrice(config: QuoteConfig): {
   });
 
   if (deliveryMultiplier > 1) {
-    const deliveryExtraUSD = Math.round(totalBeforeDeliveryUSD * deliveryMultiplier) - totalBeforeDeliveryUSD;
-    breakdown.push({ item: `${delivery?.name} Delivery`, price: deliveryExtraUSD });
+    const deliveryExtra = total - subtotal;
+    breakdown.push({ item: `${delivery?.name} Delivery`, price: deliveryExtra });
   }
 
   const ruleBreakdown = ruleAdjusted.breakdown;
-  const usdBreakdown = [...breakdown, ...ruleBreakdown].map(b => ({ item: b.item, price: Math.round(b.price * (regionMultipliers[region] ?? 1)) }));
-  const finalBreakdown = usdBreakdown.map(b => ({ item: b.item, price: convertFromUSD(b.price, currency) }));
+  const finalBreakdown = [...breakdown, ...ruleBreakdown];
 
   return {
-    basePrice: convertFromUSD(Math.round(basePrice * (regionMultipliers[region] ?? 1)), currency),
-    pagesPrice: convertFromUSD(Math.round(pagesPrice * (regionMultipliers[region] ?? 1)), currency),
-    featuresPrice: convertFromUSD(Math.round(featuresPrice * (regionMultipliers[region] ?? 1)), currency),
-    extrasPrice: convertFromUSD(Math.round(extrasPrice * (regionMultipliers[region] ?? 1)), currency),
+    basePrice,
+    pagesPrice,
+    featuresPrice,
+    extrasPrice,
     deliveryMultiplier,
-    subtotal: convertFromUSD(regionAdjustedUSD, currency),
+    subtotal: ruleAdjusted.subtotal,
     total,
     breakdown: finalBreakdown,
   };
@@ -323,7 +217,7 @@ type DiscountRule = {
   condition?: RuleCondition;
 };
 
-export type PricingRule = AddRule | MultiplyRule | DiscountRule;
+type PricingRule = AddRule | MultiplyRule | DiscountRule;
 
 type RuleInput = {
   basePrice: number;
@@ -337,70 +231,10 @@ type RuleInput = {
 function getRuleConfig(): PricingRule[] {
   try {
     const raw = localStorage.getItem("iwq_pricing_rules");
-    const base = raw ? JSON.parse(raw) : [];
-    const extraRaw = localStorage.getItem("iwq_pricing_rules_extra");
-    const extra = extraRaw ? JSON.parse(extraRaw) : [];
-    return [...base, ...extra];
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
-}
-
-export function setSpecRuleExtras(rules: PricingRule[]) {
-  try {
-    localStorage.setItem("iwq_pricing_rules_extra", JSON.stringify(rules));
-  } catch { void 0; }
-}
-
-export function clearSpecRuleExtras() {
-  try {
-    localStorage.removeItem("iwq_pricing_rules_extra");
-  } catch { void 0; }
-}
-
-export function deriveSpecRulesFromText(text: string): { rules: PricingRule[]; detectedFeatures: string[]; inferredWebsiteType?: string } {
-  const t = (text || "").toLowerCase();
-  const rules: PricingRule[] = [];
-  const features: string[] = [];
-  let inferredWebsiteType: string | undefined;
-
-  const authHits = /(auth|login|signin|signup|oauth|two[-\s]?factor|2fa|password reset)/g.test(t);
-  if (authHits) features.push("user-login");
-
-  const adminHits = /(admin|dashboard|analytics panel|cms)/g.test(t);
-  if (adminHits) features.push("admin-dashboard");
-
-  const ecommerceHits = /(e[-\s]?commerce|shop|store|cart|checkout|products)/g.test(t);
-  if (ecommerceHits) inferredWebsiteType = "ecommerce";
-
-  const paymentHits = /(stripe|paypal|payment|checkout|subscription|billing)/g.test(t);
-  if (paymentHits) features.push("payment");
-
-  const apiHits = /(api|webhook|integration|graphql|rest|sdk)/g.test(t);
-  if (apiHits) features.push("api-integration");
-
-  const multilingualHits = /(multi[-\s]?language|i18n|localization|translate)/g.test(t);
-  if (multilingualHits) features.push("multilingual");
-
-  const realtimeHits = /(real[-\s]?time|websocket|socket\.io|live update)/g.test(t);
-  if (realtimeHits) rules.push({ id: "spec-realtime", kind: "add", label: "Real-time features", amount: { percentOfSubtotal: 8 } });
-
-  const rbacHits = /(role[-\s]?based|rbac|permissions|access control)/g.test(t);
-  if (rbacHits) rules.push({ id: "spec-rbac", kind: "add", label: "Role-based access", amount: { percentOfSubtotal: 6 } });
-
-  const securityHits = /(gdpr|pci|hipaa|audit|encryption)/g.test(t);
-  if (securityHits) rules.push({ id: "spec-compliance", kind: "add", label: "Compliance and security", amount: { percentOfSubtotal: 7 } });
-
-  const backendHits = /(custom backend|microservice|queue|kafka|rabbitmq|redis|database|postgres|mysql|mongo|server[-\s]?side)/g.test(t);
-  if (backendHits) rules.push({ id: "spec-backend", kind: "add", label: "Custom backend", amount: { percentOfSubtotal: 10 } });
-
-  const reportHits = /(report|export|analytics|bi)/g.test(t);
-  if (reportHits) rules.push({ id: "spec-reporting", kind: "add", label: "Reporting and analytics", amount: { percentOfSubtotal: 5 } });
-
-  const aiHits = /(ai|machine learning|ml|chatbot)/g.test(t);
-  if (aiHits) features.push("chatbot");
-
-  return { rules, detectedFeatures: Array.from(new Set(features)), inferredWebsiteType };
 }
 
 function condPass(cond: RuleCondition | undefined, config: QuoteConfig): boolean {

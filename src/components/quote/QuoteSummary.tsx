@@ -3,7 +3,6 @@ import {
   calculatePrice,
   getWebsiteTypes,
   getDeliveryOptions,
-  formatCurrency,
   type QuoteConfig 
 } from "@/lib/pricing";
 import { Button as UIButton } from "@/components/ui/button";
@@ -42,6 +41,7 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
   const [params] = useSearchParams();
   const developerEmail = params.get("dev") || localStorage.getItem("iwq_dev_email") || "";
 
+
   const handleDownloadPDF = () => {
     const data = {
       title: websiteType?.name || "Website",
@@ -75,7 +75,7 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
     const next = [req, ...arr];
     localStorage.setItem("iwq_requests", JSON.stringify(next));
     localStorage.setItem("iwq_onboarding_current", JSON.stringify({ requestId: id }));
-    navigate(`/onboarding?id=${id}`);
+    navigate(`/payment?id=${id}`);
   };
 
   return (
@@ -141,7 +141,7 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
                     <div className="w-2 h-2 rounded-full bg-primary" />
                     <span className="text-foreground">{item.item}</span>
                   </div>
-                  <span className="font-semibold text-foreground">{formatCurrency(item.price, config.currency)}</span>
+                  <span className="font-semibold text-foreground">${item.price}</span>
                 </div>
               ))}
             </div>
@@ -149,7 +149,7 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
             <div className="mt-6 pt-6 border-t-2 border-primary/20">
               <div className="flex items-center justify-between">
                 <span className="text-xl font-semibold text-foreground">Total</span>
-                <span className="text-4xl font-bold text-gradient">{formatCurrency(pricing.total, config.currency)}</span>
+                <span className="text-4xl font-bold text-gradient">${pricing.total}</span>
               </div>
             </div>
           </div>
@@ -167,6 +167,7 @@ const QuoteSummary = ({ config, onBack }: QuoteSummaryProps) => {
               <CreditCard className="w-5 h-5" />
               Proceed to Payment
             </Button>
+            
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
                 <UIButton variant="default" size="lg" className="w-full">Save Request</UIButton>
