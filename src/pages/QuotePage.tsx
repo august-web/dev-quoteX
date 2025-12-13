@@ -1,15 +1,19 @@
 import { useState } from "react";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
-import QuoteForm from "@/components/quote/QuoteForm";
-import QuoteSummary from "@/components/quote/QuoteSummary";
-import { type QuoteConfig } from "@/lib/pricing";
+import SRSQuoteForm from "@/components/quote/SRSQuoteForm";
+import SRSQuoteSummary from "@/components/quote/SRSQuoteSummary";
+import type { SRSQuoteConfig } from "@/lib/srs";
 
 const QuotePage = () => {
-  const [quoteConfig, setQuoteConfig] = useState<QuoteConfig | null>(null);
+  const [quoteConfig, setQuoteConfig] = useState<SRSQuoteConfig | null>(null);
+  const [price, setPrice] = useState<number>(0);
+  const [breakdown, setBreakdown] = useState<Array<{ item: string; price: number }>>([]);
 
-  const handleQuoteComplete = (config: QuoteConfig) => {
+  const handleQuoteComplete = (config: SRSQuoteConfig, p: number, b: Array<{ item: string; price: number }>) => {
     setQuoteConfig(config);
+    setPrice(p);
+    setBreakdown(b);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -27,21 +31,20 @@ const QuotePage = () => {
               {/* Header */}
               <div className="text-center max-w-3xl mx-auto mb-12">
                 <span className="inline-block px-4 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4">
-                  Instant Quote Calculator
+                  Custom SRS-Based Quote
                 </span>
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4">
-                  Get Your{" "}
-                  <span className="text-gradient">Custom Quote</span>
+                  Describe Your Project → Get a Custom Price
                 </h1>
                 <p className="text-lg text-muted-foreground">
-                  Select your requirements and see your price calculated in real-time.
+                  Upload an SRS or describe your project to receive an explainable estimate.
                 </p>
               </div>
 
-              <QuoteForm onComplete={handleQuoteComplete} />
+              <SRSQuoteForm onComplete={handleQuoteComplete} />
             </>
           ) : (
-            <QuoteSummary config={quoteConfig} onBack={handleBack} />
+            <SRSQuoteSummary config={quoteConfig} price={price} breakdown={breakdown} onBack={handleBack} />
           )}
         </div>
       </main>

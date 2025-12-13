@@ -6,26 +6,9 @@ import {
   getFeatures,
   getDeliveryOptions,
   getExtraServices,
-  getPricePerPage,
   calculatePrice,
-  convertFromUSD,
-  formatCurrency,
-  currencies,
-  regions,
-  detectRegion,
-  detectRegionGeo,
-  defaultCurrencyForRegion,
-  getRegionMultiplier,
-  type QuoteConfig,
-  type CurrencyCode,
-  type RegionCode 
+  type QuoteConfig 
 } from "@/lib/pricing";
-import { setSpecRuleExtras, clearSpecRuleExtras, deriveSpecRulesFromText, type PricingRule } from "@/lib/pricing";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useRef } from "react";
-import { useToast } from "@/components/ui/use-toast";
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from "@/components/ui/select";
 import { evaluateConfig } from "@/lib/guards";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { track } from "@/lib/analytics";
@@ -59,19 +42,11 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
   const [config, setConfig] = useState<QuoteConfig>({
     websiteType: "",
     pageCount: 1,
-    selectedFeatures: ["admin-dashboard"],
+    selectedFeatures: [],
     deliveryOption: "normal",
     selectedExtras: [],
-    region: detectRegion(),
-    currency: defaultCurrencyForRegion(detectRegion()),
   });
   const [completed, setCompleted] = useState(false);
-  const [specText, setSpecText] = useState("");
-  const [specUrl, setSpecUrl] = useState("");
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisInfo, setAnalysisInfo] = useState<{ features: string[]; rules: PricingRule[]; websiteType?: string } | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const { toast } = useToast();
 
   const pricing = calculatePrice(config);
   const guard = useMemo(() => evaluateConfig(config), [config]);
@@ -86,12 +61,6 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
     };
   }, [completed, currentStep]);
 
-  useEffect(() => {
-    detectRegionGeo().then((geo) => {
-      setConfig(prev => ({ ...prev, region: geo, currency: defaultCurrencyForRegion(geo) }));
-    }).catch(() => void 0);
-  }, []);
-
   const handleNext = () => {
     if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
@@ -100,44 +69,6 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
       track({ type: "quote_complete" });
       onComplete(config);
     }
-  };
-
-  const analyzeSpec = async () => {
-    setAnalyzing(true);
-    let text = specText;
-    if (!text && specUrl) {
-      try {
-        const r = await fetch(specUrl);
-        if (r.ok) text = await r.text();
-      } catch { void 0; }
-    }
-    const derived = deriveSpecRulesFromText(text);
-    const nextFeatures = Array.from(new Set([...(config.selectedFeatures || []), ...derived.detectedFeatures]));
-    const nextWebsite = derived.inferredWebsiteType ? derived.inferredWebsiteType : config.websiteType;
-    setSpecRuleExtras(derived.rules);
-    setConfig(prev => ({ ...prev, selectedFeatures: nextFeatures, websiteType: nextWebsite }));
-    setAnalysisInfo({ features: derived.detectedFeatures, rules: derived.rules, websiteType: derived.inferredWebsiteType });
-    setAnalyzing(false);
-  };
-
-  const openFilePicker = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelected: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const type = file.type;
-    if (type === "text/plain") {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setSpecText(String(reader.result || ""));
-        toast({ title: "Document loaded", description: `${file.name}` });
-      };
-      reader.readAsText(file);
-      return;
-    }
-    toast({ title: "Unsupported file", description: "Please upload a .txt file or paste a public link/text." });
   };
 
   const handleBack = () => {
@@ -211,6 +142,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
               </span>
             </div>
           ))}
+          
         </div>
       </div>
 
@@ -267,10 +199,10 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                           : "border-border hover:bg-secondary/50"
                       }`}
                     >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-foreground">{type.name}</h3>
-                      <span className="text-primary font-bold">{formatCurrency(convertFromUSD(Math.round(type.price * getRegionMultiplier(config.region)), config.currency), config.currency)}</span>
-                    </div>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold text-foreground">{type.name}</h3>
+                        <span className="text-primary font-bold">${type.price}</span>
+                      </div>
                       <p className="text-sm text-muted-foreground">{type.description}</p>
                     </button>
                   ))}
@@ -285,7 +217,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   How many pages do you need?
                 </h2>
                 <p className="text-muted-foreground mb-8">
-                  First page is included. Additional pages are {formatCurrency(convertFromUSD(Math.round(getPricePerPage() * getRegionMultiplier(config.region)), config.currency), config.currency)} each.
+                  First page is included. Additional pages are ${50} each.
                 </p>
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="flex items-center gap-6">
@@ -311,7 +243,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                   </div>
                   {config.pageCount > 1 && (
                     <p className="mt-8 text-lg text-muted-foreground">
-                      {formatCurrency(convertFromUSD(Math.round((config.pageCount - 1) * getPricePerPage() * getRegionMultiplier(config.region)), config.currency), config.currency)} for {config.pageCount - 1} additional page{config.pageCount > 2 ? "s" : ""}
+                      +${(config.pageCount - 1) * 50} for {config.pageCount - 1} additional page{config.pageCount > 2 ? "s" : ""}
                     </p>
                   )}
                 </div>
@@ -353,7 +285,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                           </div>
                           <span className="font-medium text-foreground">{feature.name}</span>
                         </div>
-                        <span className="text-primary font-semibold">{formatCurrency(convertFromUSD(Math.round(feature.price * getRegionMultiplier(config.region)), config.currency), config.currency)}</span>
+                        <span className="text-primary font-semibold">+${feature.price}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-2 ml-8">
                         {feature.description}
@@ -445,7 +377,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                           </div>
                           <span className="font-medium text-foreground">{extra.name}</span>
                         </div>
-                        <span className="text-primary font-semibold">{formatCurrency(convertFromUSD(Math.round(extra.price * getRegionMultiplier(config.region)), config.currency), config.currency)}</span>
+                        <span className="text-primary font-semibold">+${extra.price}</span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-2 ml-8">
                         {extra.description}
@@ -453,6 +385,8 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
                     </button>
                   ))}
                 </div>
+
+                
               </div>
             )}
 
@@ -484,56 +418,13 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
         <div className="lg:col-span-1">
           <div className="bg-card rounded-2xl border border-border p-6 sticky top-24">
             <h3 className="text-lg font-semibold text-foreground mb-4">Quote Summary</h3>
-
-            {/* SRS / Document */}
-            <div className="space-y-3 mb-4">
-              <span className="text-sm font-medium text-foreground">SRS / Document</span>
-              <input ref={fileInputRef} type="file" accept=".txt,.pdf,.doc,.docx" className="hidden" onChange={handleFileSelected} />
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                <Button size="sm" variant="hero" onClick={openFilePicker} className="w-full sm:w-auto">Choose from Files/Gallery</Button>
-                <Button size="sm" variant="outline" onClick={analyzeSpec} disabled={analyzing} className="w-full sm:w-auto">{analyzing ? "Analyzing..." : "Analyze"}</Button>
-              </div>
-              <Input placeholder="Google Doc or public link" value={specUrl} onChange={(e) => setSpecUrl(e.target.value)} />
-              <Textarea placeholder="Paste SRS text (optional)" value={specText} onChange={(e) => setSpecText(e.target.value)} />
-              {analysisInfo && (
-                <div className="text-xs text-muted-foreground">
-                  <div>Detected: {analysisInfo.features.join(", ") || "None"}</div>
-                </div>
-              )}
-            </div>
-
-            {/* Currency & Region */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              <div>
-                <span className="text-xs text-muted-foreground">Currency</span>
-                <Select value={config.currency} onValueChange={(v) => setConfig(prev => ({ ...prev, currency: v as CurrencyCode }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {currencies.map(c => (
-                      <SelectItem key={c.id} value={c.id}>{c.id}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <span className="text-xs text-muted-foreground">Region</span>
-                <Select value={config.region} onValueChange={(v) => setConfig(prev => ({ ...prev, region: v as RegionCode, currency: defaultCurrencyForRegion(v as RegionCode) }))}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {regions.map(r => (
-                      <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
             
             {/* Price Breakdown */}
             <div className="space-y-3 mb-6">
               {pricing.breakdown.map((item, index) => (
                 <div key={index} className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">{item.item}</span>
-                  <span className="text-foreground font-medium">{formatCurrency(item.price, config.currency)}</span>
+                  <span className="text-foreground font-medium">${item.price}</span>
                 </div>
               ))}
             </div>
@@ -542,7 +433,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
             <div className="pt-4 border-t border-border">
               <div className="flex items-center justify-between">
                 <span className="text-foreground font-semibold">Total</span>
-                <span className="text-3xl font-bold text-gradient">{formatCurrency(pricing.total, config.currency)}</span>
+                <span className="text-3xl font-bold text-gradient">${pricing.total}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-2">
                 *Prices are estimates and may vary based on specific requirements
@@ -551,6 +442,7 @@ const QuoteForm = ({ onComplete }: QuoteFormProps) => {
           </div>
         </div>
       </div>
+      
     </div>
   );
 };
