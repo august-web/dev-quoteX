@@ -16,7 +16,8 @@ jobs:
         with:
           script: |
             const { owner, repo } = context.repo;
-            const head = `${owner}:feature/srs-pricing-payment`;
+            const headBranch = 'feature/srs-pricing-payment';
+            const head = `${owner}:${headBranch}`;
             const base = 'main';
             const title = 'feat: SRS-driven quoting, payment checkout, and documentation suite';
             const body = `
@@ -49,10 +50,15 @@ jobs:
             - Redirects to /payment; backout plan: restore /onboarding redirect and remove Payment page
             `;
 
-            const existing = await github.rest.pulls.list({ owner, repo, head, base, state: 'open' });
-            if (existing.data.length) {
-              core.info('PR already exists: ' + existing.data[0].html_url);
-            } else {
-              const pr = await github.rest.pulls.create({ owner, repo, title, body, head, base });
-              core.info('PR created: ' + pr.data.html_url);
+            try {
+              const existing = await github.rest.pulls.list({ owner, repo, head, base, state: 'open' });
+              const match = existing.data.find(pr => pr.head && pr.head.ref === headBranch && pr.base && pr.base.ref === base);
+              if (match) {
+                core.info('PR already exists: ' + match.html_url);
+              } else {
+                const pr = await github.rest.pulls.create({ owner, repo, title, body, head, base });
+                core.info('PR created: ' + pr.data.html_url);
+              }
+            } catch (err) {
+              core.warning('PR creation skipped due to error: ' + (err?.message || err));
             }
