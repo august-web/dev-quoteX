@@ -23,7 +23,7 @@ type Request = {
   depositPaid: boolean;
   finalPaid: boolean;
   progress: number;
-  config: any;
+  config: SRSQuoteConfig | QuoteConfig;
   total: number;
 };
 
@@ -68,13 +68,13 @@ const Payment = () => {
       const f = arr.find(r => r.id === id) || null;
       setReq(f);
       if (f) setBilling(prev => ({ ...prev, name: f.clientName, email: f.clientEmail, phone: f.clientPhone }));
-    } catch {}
+    } catch { setReq(null); }
   }, [id]);
 
   const breakdown = useMemo(() => {
     if (!req) return [] as Array<{ item: string; price: number }>;
     const cfg = req.config as SRSQuoteConfig | QuoteConfig;
-    if ((cfg as any)?.mode === "srs") {
+    if ((cfg as SRSQuoteConfig)?.mode === "srs") {
       const priced = priceFromAnalysis((cfg as SRSQuoteConfig).analysis, (cfg as SRSQuoteConfig).level);
       return priced.breakdown;
     } else {
@@ -120,7 +120,7 @@ const Payment = () => {
 
   const applyCoupon = () => {
     const code = couponCode.trim().toUpperCase();
-    const c = (coupons as any)[code];
+    const c = coupons[code as keyof typeof coupons];
     if (!c) { setCouponApplied(null); toast({ title: "Coupon invalid" }); return; }
     const amount = c.type === "percent" ? Math.round(toPayBase * (c.value / 100)) : c.value;
     setCouponApplied({ label: code, amount });
@@ -201,7 +201,7 @@ const Payment = () => {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-foreground">Payment Mode</span>
-                    <RadioGroup value={payMode} onValueChange={(v) => setPayMode(v as any)} className="flex gap-4">
+                    <RadioGroup value={payMode} onValueChange={(v) => setPayMode(v as "deposit" | "full")} className="flex gap-4">
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem id="deposit" value="deposit" />
                         <Label htmlFor="deposit">50% Deposit</Label>
@@ -336,7 +336,7 @@ const Payment = () => {
                     </div>
                     <div className="flex items-center gap-2">
                       <Label htmlFor="currency">Currency</Label>
-                      <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value as any)} className="border rounded-md px-2 py-1 bg-background">
+                      <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value as (typeof currencies)[number])} className="border rounded-md px-2 py-1 bg-background">
                         {currencies.map(c => (<option key={c} value={c}>{c}</option>))}
                       </select>
                     </div>
