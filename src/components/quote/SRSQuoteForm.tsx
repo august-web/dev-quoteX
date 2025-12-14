@@ -35,7 +35,7 @@ const SRSQuoteForm = ({ onComplete }: SRSQuoteFormProps) => {
     const a = analyzeSRS(src);
     const priced = priceFromAnalysis(a, level);
     setDrivers(a.drivers);
-    setAnalysisText(`Detected ${a.totalPoints} complexity points.`);
+    setAnalysisText(`Detected ${a.drivers.length} drivers, ${a.totalPoints} points.`);
     setBasePrice(priced.base);
     setBreakdown(priced.breakdown);
   };
@@ -52,8 +52,8 @@ const SRSQuoteForm = ({ onComplete }: SRSQuoteFormProps) => {
       <div className="lg:col-span-2 bg-card rounded-2xl border border-border p-8">
         <h2 className="text-2xl font-bold text-foreground mb-4">Describe your project or upload SRS</h2>
         <div className="flex items-center gap-3 mb-4">
-          <input type="file" accept=".txt,text/plain" onChange={(e) => handleFile(e.target.files?.[0] || undefined)} />
-          <span className="text-sm text-muted-foreground">Optional: upload a .txt SRS</span>
+          <input type="file" accept=".txt,.md,text/plain,text/markdown" onChange={(e) => handleFile(e.target.files?.[0] || undefined)} />
+          <span className="text-sm text-muted-foreground">Optional: upload a .txt or .md SRS</span>
         </div>
         {fileError && (
           <Alert className="mb-4" variant="destructive">
